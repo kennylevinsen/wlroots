@@ -22,6 +22,8 @@ backend_files = files(
 	'multi/backend.c',
 	'noop/backend.c',
 	'noop/output.c',
+	'rdp/backend.c',
+	'rdp/listener.c',
 	'session/direct-ipc.c',
 	'session/noop.c',
 	'session/session.c',
@@ -51,6 +53,11 @@ endif
 if logind.found()
 	backend_files += files('session/logind.c')
 	backend_deps += logind
+endif
+
+if freerdp.found()
+	backend_files += files('rdp/backend.c')
+	backend_deps += freerdp
 endif
 
 subdir('x11')

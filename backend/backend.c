@@ -12,6 +12,7 @@
 #include <wlr/backend/libinput.h>
 #include <wlr/backend/multi.h>
 #include <wlr/backend/noop.h>
+#include <wlr/backend/rdp.h>
 #include <wlr/backend/session.h>
 #include <wlr/backend/wayland.h>
 #include <wlr/config.h>
@@ -134,6 +135,11 @@ static struct wlr_backend *attempt_headless_backend(
 	return backend;
 }
 
+static struct wlr_backend *attempt_rdp_backend(struct wl_display *display,
+		wlr_renderer_create_func_t create_renderer_func) {
+	return wlr_rdp_backend_create(display, create_renderer_func);
+}
+
 static struct wlr_backend *attempt_noop_backend(struct wl_display *display) {
 	struct wlr_backend *backend = wlr_noop_backend_create(display);
 	if (backend == NULL) {
@@ -185,6 +191,8 @@ static struct wlr_backend *attempt_backend_by_name(struct wl_display *display,
 #endif
 	} else if (strcmp(name, "headless") == 0) {
 		return attempt_headless_backend(display, create_renderer_func);
+	} else if (strcmp(name, "rdp") == 0) {
+		return attempt_rdp_backend(display, create_renderer_func);
 	} else if (strcmp(name, "noop") == 0) {
 		return attempt_noop_backend(display);
 	} else if (strcmp(name, "drm") == 0 || strcmp(name, "libinput") == 0) {
