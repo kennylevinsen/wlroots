@@ -137,7 +137,15 @@ static struct wlr_backend *attempt_headless_backend(
 
 static struct wlr_backend *attempt_rdp_backend(struct wl_display *display,
 		wlr_renderer_create_func_t create_renderer_func) {
-	return wlr_rdp_backend_create(display, create_renderer_func);
+	const char *cert_path = getenv("WLR_RDP_TLS_CERT_PATH");
+	const char *key_path = getenv("WLR_RDP_TLS_KEY_PATH");
+	if (!cert_path || !key_path) {
+		wlr_log(WLR_ERROR, "The RDP backend requires WLR_RDP_TLS_CERT_PATH "
+				"and WLR_RDP_TLS_KEY_PATH to be set.");
+		return NULL;
+	}
+	return wlr_rdp_backend_create(display, create_renderer_func,
+			cert_path, key_path);
 }
 
 static struct wlr_backend *attempt_noop_backend(struct wl_display *display) {

@@ -1,7 +1,17 @@
-#include <assert.h>
 #include <stdlib.h>
 #include <wlr/util/log.h>
 #include "backend/rdp.h"
+
+static int rdp_incoming_peer(
+		freerdp_listener *listener, freerdp_peer *client) {
+	struct wlr_rdp_backend *backend =
+		(struct wlr_rdp_backend *)listener->param4;
+	if (rdp_peer_init(client, backend) < 0) {
+		wlr_log(WLR_ERROR, "Error initializing incoming peer");
+		return false;
+	}
+	return true;
+}
 
 static int rdp_listener_activity(int fd, uint32_t mask, void *data) {
 	freerdp_listener *listener = (freerdp_listener *)data;
@@ -13,14 +23,6 @@ static int rdp_listener_activity(int fd, uint32_t mask, void *data) {
 		return -1;
 	}
 	return 0;
-}
-
-static int rdp_incoming_peer(
-		freerdp_listener *listener, freerdp_peer *client) {
-	//struct wlr_rdp_backend *backend =
-	//	(struct wlr_rdp_backend *)listener->param4;
-	wlr_log(WLR_DEBUG, "New RDP connection");
-	return 1;
 }
 
 bool rdp_configure_listener(struct wlr_rdp_backend *backend) {

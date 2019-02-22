@@ -62,7 +62,8 @@ static void handle_display_destroy(struct wl_listener *listener, void *data) {
 }
 
 struct wlr_backend *wlr_rdp_backend_create(struct wl_display *display,
-		wlr_renderer_create_func_t create_renderer_func) {
+		wlr_renderer_create_func_t create_renderer_func,
+		const char *tls_cert_path, const char *tls_key_path) {
 	wlr_log(WLR_INFO, "Creating RDP backend");
 
 	struct wlr_rdp_backend *backend =
@@ -73,6 +74,8 @@ struct wlr_backend *wlr_rdp_backend_create(struct wl_display *display,
 	}
 	wlr_backend_init(&backend->backend, &backend_impl);
 	backend->display = display;
+	backend->tls_cert_path = tls_cert_path;
+	backend->tls_key_path = tls_key_path;
 
 	static const EGLint config_attribs[] = {
 		EGL_SURFACE_TYPE, EGL_PBUFFER_BIT,

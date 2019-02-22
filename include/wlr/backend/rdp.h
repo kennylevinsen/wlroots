@@ -18,7 +18,8 @@
  * TODO: add freerdp options like bind port to this
  */
 struct wlr_backend *wlr_rdp_backend_create(struct wl_display *display,
-	wlr_renderer_create_func_t create_renderer_func);
+	wlr_renderer_create_func_t create_renderer_func,
+		const char *tls_cert_path, const char *tls_key_path);
 
 bool wlr_backend_is_rdp(struct wlr_backend *backend);
 bool wlr_input_device_is_rdp(struct wlr_input_device *device);
