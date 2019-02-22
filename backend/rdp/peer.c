@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include <stdlib.h>
 #include <string.h>
+#include <wlr/types/wlr_output.h>
 #include <wlr/util/log.h>
 #include "backend/rdp.h"
 
@@ -13,8 +14,32 @@ static BOOL xf_peer_post_connect(freerdp_peer *client) {
 }
 
 static BOOL xf_peer_activate(freerdp_peer *client) {
-	wlr_log(WLR_DEBUG, "TODO: Activate peer");
-	return FALSE;
+	struct wlr_rdp_peer_context *context =
+		(struct wlr_rdp_peer_context *)client->context;
+	struct wlr_rdp_backend *backend = context->backend;
+	rdpSettings *settings = client->settings;
+
+	if (!settings->SurfaceCommandsEnabled) {
+		wlr_log(WLR_ERROR, "RDP peer does not support SurfaceCommands");
+		return FALSE;
+	}
+
+	context->output = wlr_rdp_output_create(backend,
+			(int)settings->DesktopWidth, (int)settings->DesktopHeight);
+	rfx_context_reset(context->rfx_context,
+			context->output->wlr_output.width,
+			context->output->wlr_output.height);
+	nsc_context_reset(context->nsc_context,
+			context->output->wlr_output.width,
+			context->output->wlr_output.height);
+
+	if (context->flags & RDP_PEER_ACTIVATED) {
+		return TRUE;
+	}
+
+	// TODO: Configure input devices
+
+	return TRUE;
 }
 
 static int xf_suppress_output(rdpContext *context,
@@ -113,6 +138,9 @@ static void rdp_peer_context_free(
 		// TODO: destroy keyboard/pointer/output
 	}
 
+	wl_list_remove(&context->link);
+	wlr_output_destroy(&context->output->wlr_output);
+
 	Stream_Free(context->encode_stream, TRUE);
 	nsc_context_free(context->nsc_context);
 	rfx_context_free(context->rfx_context);
@@ -179,7 +207,7 @@ int rdp_peer_init(freerdp_peer *client,
 		peer_context->events[i] = NULL;
 	}
 
-	// TODO: Stick the client in a list of peers somewhere, I guess
+	wl_list_insert(&backend->clients, &peer_context->link);
 	return 0;
 
 err_init:

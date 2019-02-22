@@ -20,7 +20,6 @@ static bool backend_start(struct wlr_backend *wlr_backend) {
 	if (!rdp_configure_listener(backend)) {
 		return false;
 	}
-	backend->started = true;
 	return true;
 }
 
@@ -76,6 +75,7 @@ struct wlr_backend *wlr_rdp_backend_create(struct wl_display *display,
 	backend->display = display;
 	backend->tls_cert_path = tls_cert_path;
 	backend->tls_key_path = tls_key_path;
+	wl_list_init(&backend->clients);
 
 	static const EGLint config_attribs[] = {
 		EGL_SURFACE_TYPE, EGL_PBUFFER_BIT,
