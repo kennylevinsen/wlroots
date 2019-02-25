@@ -24,7 +24,7 @@ static BOOL xf_peer_activate(freerdp_peer *client) {
 		return FALSE;
 	}
 
-	context->output = wlr_rdp_output_create(backend,
+	context->output = wlr_rdp_output_create(backend, context,
 			(int)settings->DesktopWidth, (int)settings->DesktopHeight);
 	rfx_context_reset(context->rfx_context,
 			context->output->wlr_output.width,

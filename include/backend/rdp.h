@@ -1,5 +1,6 @@
 #ifndef BACKEND_RDP_H
 #define BACKEND_RDP_H
+#include <pixman.h>
 #include <wlr/backend/rdp.h>
 #include <wlr/backend/interface.h>
 #include <wlr/types/wlr_output.h>
@@ -14,11 +15,15 @@
 
 #define MAX_FREERDP_FDS 64
 
+struct wlr_rdp_peer_context;
+
 struct wlr_rdp_output {
 	struct wlr_output wlr_output;
 	struct wlr_rdp_backend *backend;
+	struct wlr_rdp_peer_context *context;
 
 	void *egl_surface;
+	pixman_image_t *shadow_surface;
 	struct wl_event_source *frame_timer;
 	int frame_delay; // ms
 };
@@ -66,6 +71,7 @@ struct wlr_rdp_backend *rdp_backend_from_backend(
 bool rdp_configure_listener(struct wlr_rdp_backend *backend);
 int rdp_peer_init(freerdp_peer *client, struct wlr_rdp_backend *backend);
 struct wlr_rdp_output *wlr_rdp_output_create(struct wlr_rdp_backend *backend,
-		unsigned int width, unsigned int height);
+		struct wlr_rdp_peer_context *context, unsigned int width,
+		unsigned int height);
 
 #endif

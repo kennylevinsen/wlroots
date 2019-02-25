@@ -49,6 +49,12 @@ static bool output_set_custom_mode(struct wlr_output *wlr_output, int32_t width,
 
 	output->frame_delay = 1000000 / refresh;
 
+	if (output->shadow_surface) {
+		pixman_image_unref(output->shadow_surface);
+	}
+	output->shadow_surface = pixman_image_create_bits(PIXMAN_x8r8g8b8,
+			width, height, NULL, width * 4);
+
 	wlr_output_update_custom_mode(&output->wlr_output, width, height, refresh);
 	return true;
 }
@@ -67,11 +73,82 @@ static bool output_make_current(struct wlr_output *wlr_output, int *buffer_age) 
 		buffer_age);
 }
 
-static bool output_swap_buffers(struct wlr_output *wlr_output,
-		pixman_region32_t *damage) {
-	// TODO: Transmit to client
-	wlr_output_send_present(wlr_output, NULL);
+static bool rfx_swap_buffers(
+		struct wlr_rdp_output *output, pixman_region32_t *damage) {
+	struct wlr_rdp_peer_context *context = output->context;
+	freerdp_peer *peer = context->peer;
+	rdpUpdate *update = peer->update;
+
+	Stream_Clear(context->encode_stream);
+	Stream_SetPosition(context->encode_stream, 0);
+	int width = damage->extents.x2 - damage->extents.x1;
+	int height = damage->extents.y2 - damage->extents.y1;
+
+	SURFACE_BITS_COMMAND cmd;
+	cmd.skipCompression = TRUE;
+	cmd.destLeft = damage->extents.x1;
+	cmd.destTop = damage->extents.y1;
+	cmd.destRight = damage->extents.x2;
+	cmd.destBottom = damage->extents.y2;
+	cmd.bmp.bpp = 32;
+	cmd.bmp.codecID = peer->settings->RemoteFxCodecId;
+	cmd.bmp.width = width;
+	cmd.bmp.height = height;
+
+	struct wlr_renderer *renderer =
+		wlr_backend_get_renderer(&output->backend->backend);
+	if (!wlr_renderer_read_pixels(renderer, WL_SHM_FORMAT_XRGB8888,
+				NULL, pixman_image_get_stride(output->shadow_surface),
+				width, height, damage->extents.x1, damage->extents.y1,
+				damage->extents.x1, damage->extents.y1,
+				pixman_image_get_data(output->shadow_surface))) {
+		return false;
+	}
+
+	uint32_t *ptr = pixman_image_get_data(output->shadow_surface) +
+		damage->extents.x1 + damage->extents.y1 *
+		(pixman_image_get_stride(output->shadow_surface) / sizeof(uint32_t));
+
+	RFX_RECT *rfx_rect;
+	int nrects;
+	pixman_box32_t *rects =
+		pixman_region32_rectangles(damage, &nrects);
+	context->rfx_rects = realloc(context->rfx_rects, nrects * sizeof(*rfx_rect));
+
+	for (int i = 0; i < nrects; ++i) {
+		pixman_box32_t *region = &rects[i];
+		rfx_rect = &context->rfx_rects[i];
+		rfx_rect->x = region->x1 - damage->extents.x1;
+		rfx_rect->y = region->y1 - damage->extents.y1;
+		rfx_rect->width = region->x2 - region->x1;
+		rfx_rect->height = region->y2 - region->y1;
+	}
+
+	rfx_compose_message(context->rfx_context, context->encode_stream,
+			context->rfx_rects, nrects, (BYTE *)ptr, width, height,
+			pixman_image_get_stride(output->shadow_surface));
+	cmd.bmp.bitmapDataLength = Stream_GetPosition(context->encode_stream);
+	cmd.bmp.bitmapData = Stream_Buffer(context->encode_stream);
+
+	update->SurfaceBits(update->context, &cmd);
 	return true;
+}
+
+static bool output_swap_buffers(
+		struct wlr_output *wlr_output, pixman_region32_t *damage) {
+	struct wlr_rdp_output *output =
+		rdp_output_from_output(wlr_output);
+	bool ret = false;
+	rdpSettings *settings = output->context->peer->settings;
+	if (settings->RemoteFxCodec) {
+		ret = rfx_swap_buffers(output, damage);
+	} else if (settings->NSCodec) {
+		wlr_log(WLR_DEBUG, "nsc swap buffers");
+	} else {
+		wlr_log(WLR_DEBUG, "raw swap buffers");
+	}
+	wlr_output_send_present(wlr_output, NULL);
+	return ret;
 }
 
 static void output_destroy(struct wlr_output *wlr_output) {
@@ -79,6 +156,9 @@ static void output_destroy(struct wlr_output *wlr_output) {
 		rdp_output_from_output(wlr_output);
 	wl_event_source_remove(output->frame_timer);
 	wlr_egl_destroy_surface(&output->backend->egl, output->egl_surface);
+	if (output->shadow_surface) {
+		pixman_image_unref(output->shadow_surface);
+	}
 	free(output);
 }
 
@@ -102,7 +182,8 @@ static int signal_frame(void *data) {
 }
 
 struct wlr_rdp_output *wlr_rdp_output_create(struct wlr_rdp_backend *backend,
-		unsigned int width, unsigned int height) {
+		struct wlr_rdp_peer_context *context, unsigned int width,
+		unsigned int height) {
 	struct wlr_rdp_output *output =
 		calloc(1, sizeof(struct wlr_rdp_output));
 	if (output == NULL) {
@@ -110,6 +191,7 @@ struct wlr_rdp_output *wlr_rdp_output_create(struct wlr_rdp_backend *backend,
 		return NULL;
 	}
 	output->backend = backend;
+	output->context = context;
 	wlr_output_init(&output->wlr_output, &backend->backend, &output_impl,
 		backend->display);
 	struct wlr_output *wlr_output = &output->wlr_output;
@@ -124,7 +206,7 @@ struct wlr_rdp_output *wlr_rdp_output_create(struct wlr_rdp_backend *backend,
 	strncpy(wlr_output->make, "RDP", sizeof(wlr_output->make));
 	strncpy(wlr_output->model, "RDP", sizeof(wlr_output->model));
 	snprintf(wlr_output->name, sizeof(wlr_output->name), "RDP-%d",
-		wl_list_length(&backend->clients) + 1);
+		wl_list_length(&backend->clients));
 
 	if (!wlr_egl_make_current(&output->backend->egl, output->egl_surface,
 			NULL)) {
