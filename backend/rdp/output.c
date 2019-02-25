@@ -95,16 +95,6 @@ static bool rfx_swap_buffers(
 	cmd.bmp.width = width;
 	cmd.bmp.height = height;
 
-	struct wlr_renderer *renderer =
-		wlr_backend_get_renderer(&output->backend->backend);
-	if (!wlr_renderer_read_pixels(renderer, WL_SHM_FORMAT_XRGB8888,
-				NULL, pixman_image_get_stride(output->shadow_surface),
-				width, height, damage->extents.x1, damage->extents.y1,
-				damage->extents.x1, damage->extents.y1,
-				pixman_image_get_data(output->shadow_surface))) {
-		return false;
-	}
-
 	uint32_t *ptr = pixman_image_get_data(output->shadow_surface) +
 		damage->extents.x1 + damage->extents.y1 *
 		(pixman_image_get_stride(output->shadow_surface) / sizeof(uint32_t));
@@ -134,16 +124,72 @@ static bool rfx_swap_buffers(
 	return true;
 }
 
+static bool nsc_swap_buffers(
+		struct wlr_rdp_output *output, pixman_region32_t *damage) {
+	struct wlr_rdp_peer_context *context = output->context;
+	freerdp_peer *peer = context->peer;
+	rdpUpdate *update = peer->update;
+
+	Stream_Clear(context->encode_stream);
+	Stream_SetPosition(context->encode_stream, 0);
+	int width = damage->extents.x2 - damage->extents.x1;
+	int height = damage->extents.y2 - damage->extents.y1;
+
+	SURFACE_BITS_COMMAND cmd;
+	cmd.skipCompression = TRUE;
+	cmd.destLeft = damage->extents.x1;
+	cmd.destTop = damage->extents.y1;
+	cmd.destRight = damage->extents.x2;
+	cmd.destBottom = damage->extents.y2;
+	cmd.bmp.bpp = 32;
+	cmd.bmp.codecID = peer->settings->NSCodecId;
+	cmd.bmp.width = width;
+	cmd.bmp.height = height;
+
+	uint32_t *ptr = pixman_image_get_data(output->shadow_surface) +
+		damage->extents.x1 + damage->extents.y1 *
+		(pixman_image_get_stride(output->shadow_surface) / sizeof(uint32_t));
+
+	nsc_compose_message(context->nsc_context, context->encode_stream,
+			(BYTE *)ptr, width, height,
+			pixman_image_get_stride(output->shadow_surface));
+
+	cmd.bmp.bitmapDataLength = Stream_GetPosition(context->encode_stream);
+	cmd.bmp.bitmapData = Stream_Buffer(context->encode_stream);
+
+	update->SurfaceBits(update->context, &cmd);
+	return true;
+}
+
 static bool output_swap_buffers(
 		struct wlr_output *wlr_output, pixman_region32_t *damage) {
+	if (!pixman_region32_not_empty(damage)) {
+		return true;
+	}
+
 	struct wlr_rdp_output *output =
 		rdp_output_from_output(wlr_output);
+
+	// Update shadow buffer
+	int width = damage->extents.x2 - damage->extents.x1;
+	int height = damage->extents.y2 - damage->extents.y1;
+	struct wlr_renderer *renderer =
+		wlr_backend_get_renderer(&output->backend->backend);
+	if (!wlr_renderer_read_pixels(renderer, WL_SHM_FORMAT_XRGB8888,
+				NULL, pixman_image_get_stride(output->shadow_surface),
+				width, height, damage->extents.x1, damage->extents.y1,
+				damage->extents.x1, damage->extents.y1,
+				pixman_image_get_data(output->shadow_surface))) {
+		return false;
+	}
+
+	// Send along to clients
 	bool ret = false;
 	rdpSettings *settings = output->context->peer->settings;
 	if (settings->RemoteFxCodec) {
 		ret = rfx_swap_buffers(output, damage);
 	} else if (settings->NSCodec) {
-		wlr_log(WLR_DEBUG, "nsc swap buffers");
+		ret = nsc_swap_buffers(output, damage);
 	} else {
 		wlr_log(WLR_DEBUG, "raw swap buffers");
 	}
