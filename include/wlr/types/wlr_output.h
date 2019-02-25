@@ -277,4 +277,14 @@ enum wl_output_transform wlr_output_transform_invert(
 enum wl_output_transform wlr_output_transform_compose(
 	enum wl_output_transform tr_a, enum wl_output_transform tr_b);
 
+/**
+ * Marks the output as in need of a buffer swap.
+ */
+void wlr_output_update_needs_swap(struct wlr_output *output);
+
+/**
+ * Damages the whole output.
+ */
+void wlr_output_damage_whole(struct wlr_output *output);
+
 #endif

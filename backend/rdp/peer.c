@@ -1,9 +1,11 @@
 #define _POSIX_C_SOURCE 200809L
+#include <linux/input.h>
 #include <stdlib.h>
 #include <string.h>
 #include <wlr/types/wlr_output.h>
 #include <wlr/util/log.h>
 #include "backend/rdp.h"
+#include "util/signal.h"
 
 static BOOL xf_peer_capabilities(freerdp_peer *client) {
 	return TRUE;
@@ -37,7 +39,14 @@ static BOOL xf_peer_activate(freerdp_peer *client) {
 		return TRUE;
 	}
 
-	// TODO: Configure input devices
+	context->pointer = wlr_rdp_pointer_create(backend);
+	// Use wlroots' software cursors instead of remote cursors
+	POINTER_SYSTEM_UPDATE pointer_system;
+	rdpPointerUpdate *pointer = client->update->pointer;
+	pointer_system.type = SYSPTR_NULL;
+	pointer->PointerSystem(client->context, &pointer_system);
+
+	// TODO: Configure keyboard
 
 	return TRUE;
 }
@@ -55,19 +64,100 @@ static int xf_suppress_output(rdpContext *context,
 }
 
 static int xf_input_synchronize_event(rdpInput *input, UINT32 flags) {
-	// TODO
+	struct wlr_rdp_peer_context *context =
+		(struct wlr_rdp_peer_context *)input->context;
+	wlr_output_damage_whole(&context->output->wlr_output);
 	return true;
+}
+
+static inline int64_t timespec_to_msec(const struct timespec *a) {
+	return (int64_t)a->tv_sec * 1000 + a->tv_nsec / 1000000;
 }
 
 static int xf_input_mouse_event(rdpInput *input,
 		UINT16 flags, UINT16 x, UINT16 y) {
-	// TODO
+	struct wlr_rdp_peer_context *context =
+		(struct wlr_rdp_peer_context *)input->context;
+	struct wlr_input_device *wlr_device = &context->pointer->wlr_input_device;
+	struct wlr_pointer *pointer = wlr_device->pointer;
+	bool frame = false;
+	struct timespec now;
+	clock_gettime(CLOCK_MONOTONIC, &now);
+
+	if (flags & PTR_FLAGS_MOVE) {
+		struct wlr_event_pointer_motion_absolute event = { 0 };
+		int width, height;
+		wlr_output_effective_resolution(
+				&context->output->wlr_output, &width, &height);
+		event.device = wlr_device;
+		event.time_msec = timespec_to_msec(&now);
+		event.x = x / (double)width;
+		event.y = y / (double)height;
+		wlr_signal_emit_safe(&pointer->events.motion_absolute, &event);
+		frame = true;
+	}
+
+	uint32_t button = 0;
+	if (flags & PTR_FLAGS_BUTTON1) {
+		button = BTN_LEFT;
+	} else if (flags & PTR_FLAGS_BUTTON2) {
+		button = BTN_RIGHT;
+	} else if (flags & PTR_FLAGS_BUTTON3) {
+		button = BTN_MIDDLE;
+	}
+
+	if (button) {
+		struct wlr_event_pointer_button event = { 0 };
+		event.device = wlr_device;
+		event.time_msec = timespec_to_msec(&now);
+		event.button = button;
+		event.state = (flags & PTR_FLAGS_DOWN) ?
+			WLR_BUTTON_PRESSED : WLR_BUTTON_RELEASED;
+		wlr_signal_emit_safe(&pointer->events.button, &event);
+		frame = true;
+	}
+
+	if (flags & PTR_FLAGS_WHEEL) {
+		double value = -(flags & 0xFF) / 120.0;
+		if (flags & PTR_FLAGS_WHEEL_NEGATIVE) {
+			value = -value;
+		}
+		struct wlr_event_pointer_axis event = { 0 };
+		event.device = &context->pointer->wlr_input_device;
+		event.time_msec = timespec_to_msec(&now);
+		event.source = WLR_AXIS_SOURCE_WHEEL;
+		event.orientation = WLR_AXIS_ORIENTATION_VERTICAL;
+		event.delta = value;
+		event.delta_discrete = (int32_t)value;
+		wlr_signal_emit_safe(&pointer->events.axis, &event);
+		frame = true;
+	}
+
+	if (frame) {
+		wlr_signal_emit_safe(&pointer->events.frame, pointer);
+	}
+
 	return true;
 }
 
 static int xf_input_extended_mouse_event(
 		rdpInput *input, UINT16 flags, UINT16 x, UINT16 y) {
-	// TODO
+	struct wlr_rdp_peer_context *context =
+		(struct wlr_rdp_peer_context *)input->context;
+	struct wlr_input_device *wlr_device = &context->pointer->wlr_input_device;
+	struct wlr_pointer *pointer = wlr_device->pointer;
+	struct timespec now;
+	clock_gettime(CLOCK_MONOTONIC, &now);
+	struct wlr_event_pointer_motion_absolute event = { 0 };
+	int width, height;
+	wlr_output_effective_resolution(
+			&context->output->wlr_output, &width, &height);
+	event.device = wlr_device;
+	event.time_msec = timespec_to_msec(&now);
+	event.x = x / (double)width;
+	event.y = y / (double)height;
+	wlr_signal_emit_safe(&pointer->events.motion_absolute, &event);
+	wlr_signal_emit_safe(&pointer->events.frame, pointer);
 	return true;
 }
 

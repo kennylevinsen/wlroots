@@ -3,6 +3,8 @@
 #include <pixman.h>
 #include <wlr/backend/rdp.h>
 #include <wlr/backend/interface.h>
+#include <wlr/types/wlr_pointer.h>
+#include <wlr/types/wlr_input_device.h>
 #include <wlr/types/wlr_output.h>
 #include <freerdp/freerdp.h>
 #include <freerdp/listener.h>
@@ -28,6 +30,10 @@ struct wlr_rdp_output {
 	int frame_delay; // ms
 };
 
+struct wlr_rdp_input_device {
+	struct wlr_input_device wlr_input_device;
+};
+
 enum wlr_rdp_peer_flags {
 	RDP_PEER_ACTIVATED = 1 << 0,
 	RDP_PEER_OUTPUT_ENABLED = 1 << 1,
@@ -46,6 +52,7 @@ struct wlr_rdp_peer_context {
 	NSC_CONTEXT *nsc_context;
 
 	struct wlr_rdp_output *output;
+	struct wlr_rdp_input_device *pointer;
 
 	struct wl_list link;
 };
@@ -73,5 +80,7 @@ int rdp_peer_init(freerdp_peer *client, struct wlr_rdp_backend *backend);
 struct wlr_rdp_output *wlr_rdp_output_create(struct wlr_rdp_backend *backend,
 		struct wlr_rdp_peer_context *context, unsigned int width,
 		unsigned int height);
+struct wlr_rdp_input_device *wlr_rdp_pointer_create(
+		struct wlr_rdp_backend *backend);
 
 #endif
