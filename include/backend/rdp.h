@@ -1,19 +1,21 @@
 #ifndef BACKEND_RDP_H
 #define BACKEND_RDP_H
-#include <pixman.h>
-#include <wlr/backend/rdp.h>
-#include <wlr/backend/interface.h>
-#include <wlr/types/wlr_pointer.h>
-#include <wlr/types/wlr_input_device.h>
-#include <wlr/types/wlr_output.h>
-#include <freerdp/freerdp.h>
-#include <freerdp/listener.h>
-#include <freerdp/update.h>
-#include <freerdp/input.h>
 #include <freerdp/codec/color.h>
-#include <freerdp/codec/rfx.h>
 #include <freerdp/codec/nsc.h>
+#include <freerdp/codec/rfx.h>
+#include <freerdp/freerdp.h>
+#include <freerdp/input.h>
+#include <freerdp/listener.h>
 #include <freerdp/locale/keyboard.h>
+#include <freerdp/update.h>
+#include <pixman.h>
+#include <wlr/backend/interface.h>
+#include <wlr/backend/rdp.h>
+#include <wlr/types/wlr_input_device.h>
+#include <wlr/types/wlr_keyboard.h>
+#include <wlr/types/wlr_output.h>
+#include <wlr/types/wlr_pointer.h>
+#include <xkbcommon/xkbcommon.h>
 
 #define MAX_FREERDP_FDS 64
 
@@ -32,6 +34,11 @@ struct wlr_rdp_output {
 
 struct wlr_rdp_input_device {
 	struct wlr_input_device wlr_input_device;
+};
+
+struct wlr_rdp_keyboard {
+	struct wlr_keyboard keyboard;
+	struct xkb_keymap *keymap;
 };
 
 enum wlr_rdp_peer_flags {
@@ -53,6 +60,7 @@ struct wlr_rdp_peer_context {
 
 	struct wlr_rdp_output *output;
 	struct wlr_rdp_input_device *pointer;
+	struct wlr_rdp_input_device *keyboard;
 
 	struct wl_list link;
 };
@@ -82,5 +90,7 @@ struct wlr_rdp_output *wlr_rdp_output_create(struct wlr_rdp_backend *backend,
 		unsigned int height);
 struct wlr_rdp_input_device *wlr_rdp_pointer_create(
 		struct wlr_rdp_backend *backend);
+struct wlr_rdp_input_device *wlr_rdp_keyboard_create(
+		struct wlr_rdp_backend *backend, rdpSettings *settings);
 
 #endif

@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <wlr/types/wlr_output.h>
+#include <wlr/interfaces/wlr_keyboard.h>
 #include <wlr/util/log.h>
 #include "backend/rdp.h"
 #include "util/signal.h"
@@ -46,8 +47,9 @@ static BOOL xf_peer_activate(freerdp_peer *client) {
 	pointer_system.type = SYSPTR_NULL;
 	pointer->PointerSystem(client->context, &pointer_system);
 
-	// TODO: Configure keyboard
+	context->keyboard = wlr_rdp_keyboard_create(backend, settings);
 
+	context->flags |= RDP_PEER_ACTIVATED;
 	return TRUE;
 }
 
@@ -162,7 +164,46 @@ static int xf_input_extended_mouse_event(
 }
 
 static int xf_input_keyboard_event(rdpInput *input, UINT16 flags, UINT16 code) {
-	// TODO
+	struct wlr_rdp_peer_context *context =
+		(struct wlr_rdp_peer_context *)input->context;
+	struct wlr_input_device *wlr_device = &context->keyboard->wlr_input_device;
+	struct wlr_keyboard *keyboard = wlr_device->keyboard;
+	struct timespec now;
+	clock_gettime(CLOCK_MONOTONIC, &now);
+
+	if (!(context->flags & RDP_PEER_ACTIVATED)) {
+		return true;
+	}
+
+	bool notify = false;
+	enum wlr_key_state state;
+	if ((flags & KBD_FLAGS_DOWN)) {
+		state = WLR_KEY_PRESSED;
+		notify = true;
+	} else if ((flags & KBD_FLAGS_RELEASE)) {
+		state = WLR_KEY_RELEASED;
+		notify = true;
+	}
+
+	if (notify) {
+		uint32_t full_code = code;
+		if (flags & KBD_FLAGS_EXTENDED) {
+			full_code |= KBD_FLAGS_EXTENDED;
+		}
+		uint32_t vk_code = GetVirtualKeyCodeFromVirtualScanCode(full_code, 4);
+		if (flags & KBD_FLAGS_EXTENDED) {
+			vk_code |= KBDEXT;
+		}
+		uint32_t scan_code = GetKeycodeFromVirtualKeyCode(
+				vk_code, KEYCODE_TYPE_EVDEV);
+		struct wlr_event_keyboard_key event = { 0 };
+		event.time_msec = timespec_to_msec(&now);
+		event.keycode = scan_code - 8;
+		event.state = state;
+		event.update_state = true;
+		wlr_keyboard_notify_key(keyboard, &event);
+	}
+
 	return true;
 }
 

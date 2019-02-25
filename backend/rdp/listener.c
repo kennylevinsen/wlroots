@@ -29,7 +29,7 @@ bool rdp_configure_listener(struct wlr_rdp_backend *backend) {
 	backend->listener = freerdp_listener_new();
 	backend->listener->PeerAccepted = rdp_incoming_peer;
 	backend->listener->param4 = backend;
-	if (!backend->listener->Open(backend->listener, "127.0.0.1", 3389)) {
+	if (!backend->listener->Open(backend->listener, "0.0.0.0", 3389)) {
 		wlr_log(WLR_ERROR, "Failed to bind to RDP socket");
 		return false;
 	}
