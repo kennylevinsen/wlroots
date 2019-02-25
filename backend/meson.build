@@ -22,10 +22,6 @@ backend_files = files(
 	'multi/backend.c',
 	'noop/backend.c',
 	'noop/output.c',
-	'rdp/backend.c',
-	'rdp/listener.c',
-	'rdp/output.c',
-	'rdp/peer.c',
 	'session/direct-ipc.c',
 	'session/noop.c',
 	'session/session.c',
@@ -58,11 +54,17 @@ if logind.found()
 endif
 
 if freerdp.found()
-	backend_files += files('rdp/backend.c')
+	backend_files += files(
+		'rdp/backend.c',
+		'rdp/listener.c',
+		'rdp/output.c',
+		'rdp/peer.c',
+	)
 	backend_deps += [
 		freerdp,
 		winpr2
 	]
+	conf_data.set10('WLR_HAS_RDP_BACKEND', true)
 endif
 
 subdir('x11')
