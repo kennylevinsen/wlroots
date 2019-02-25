@@ -191,7 +191,8 @@ static bool output_swap_buffers(
 	} else if (settings->NSCodec) {
 		ret = nsc_swap_buffers(output, damage);
 	} else {
-		wlr_log(WLR_DEBUG, "raw swap buffers");
+		// This would perform like ass so why bother
+		wlr_log(WLR_ERROR, "Raw updates are not supported; use rfx or nsc");
 	}
 	wlr_output_send_present(wlr_output, NULL);
 	return ret;
