@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <wlr/types/wlr_output.h>
+#include <wlr/interfaces/wlr_input_device.h>
 #include <wlr/interfaces/wlr_keyboard.h>
 #include <wlr/util/log.h>
 #include "backend/rdp.h"
@@ -260,13 +261,17 @@ static void rdp_peer_context_free(
 	if (!context) {
 		return;
 	}
+
 	for (int i = 0; i < MAX_FREERDP_FDS; ++i) {
 		if (context->events[i]) {
 			wl_event_source_remove(context->events[i]);
 		}
 	}
+
 	if (context->flags & RDP_PEER_ACTIVATED) {
-		// TODO: destroy keyboard/pointer/output
+		wlr_output_destroy(&context->output->wlr_output);
+		wlr_input_device_destroy(&context->pointer->wlr_input_device);
+		wlr_input_device_destroy(&context->keyboard->wlr_input_device);
 	}
 
 	wl_list_remove(&context->link);

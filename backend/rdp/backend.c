@@ -32,7 +32,11 @@ static void backend_destroy(struct wlr_backend *wlr_backend) {
 
 	wl_list_remove(&backend->display_destroy.link);
 
-	// TODO: Disconnect clients
+	struct wlr_rdp_peer_context *client;
+	wl_list_for_each(client, &backend->clients, link) {
+		freerdp_peer_context_free(client->peer);
+		freerdp_peer_free(client->peer);
+	}
 
 	wlr_signal_emit_safe(&wlr_backend->events.destroy, backend);
 
