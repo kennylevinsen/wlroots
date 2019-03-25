@@ -74,6 +74,8 @@ struct wlr_rdp_backend {
 
 	const char *tls_cert_path;
 	const char *tls_key_path;
+	char *address;
+	int port;
 
 	freerdp_listener *listener;
 	struct wl_event_source *listener_events[MAX_FREERDP_FDS];

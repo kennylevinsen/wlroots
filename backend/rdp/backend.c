@@ -1,5 +1,7 @@
+#define _POSIX_C_SOURCE 200809L
 #include <assert.h>
 #include <stdlib.h>
+#include <string.h>
 #include <wlr/render/egl.h>
 #include <wlr/render/gles2.h>
 #include <wlr/util/log.h>
@@ -16,11 +18,27 @@ struct wlr_rdp_backend *rdp_backend_from_backend(
 static bool backend_start(struct wlr_backend *wlr_backend) {
 	struct wlr_rdp_backend *backend =
 		rdp_backend_from_backend(wlr_backend);
+	assert(backend->listener == NULL);
 	wlr_log(WLR_INFO, "Starting RDP backend");
 	if (!rdp_configure_listener(backend)) {
 		return false;
 	}
 	return true;
+}
+
+void wlr_rdp_backend_set_address(struct wlr_backend *wlr_backend,
+		const char *address) {
+	struct wlr_rdp_backend *backend =
+		rdp_backend_from_backend(wlr_backend);
+	assert(backend->listener == NULL);
+	backend->address = strdup(address);
+}
+
+void wlr_rdp_backend_set_port(struct wlr_backend *wlr_backend, int port) {
+	struct wlr_rdp_backend *backend =
+		rdp_backend_from_backend(wlr_backend);
+	assert(backend->listener == NULL);
+	backend->port = port;
 }
 
 static void backend_destroy(struct wlr_backend *wlr_backend) {
@@ -42,6 +60,7 @@ static void backend_destroy(struct wlr_backend *wlr_backend) {
 
 	wlr_renderer_destroy(backend->renderer);
 	wlr_egl_finish(&backend->egl);
+	free(backend->address);
 	free(backend);
 }
 
@@ -79,6 +98,8 @@ struct wlr_backend *wlr_rdp_backend_create(struct wl_display *display,
 	backend->display = display;
 	backend->tls_cert_path = tls_cert_path;
 	backend->tls_key_path = tls_key_path;
+	backend->address = strdup("127.0.0.1");
+	backend->port = 3389;
 	wl_list_init(&backend->clients);
 
 	static const EGLint config_attribs[] = {

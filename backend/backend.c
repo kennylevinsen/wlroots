@@ -147,8 +147,25 @@ static struct wlr_backend *attempt_rdp_backend(struct wl_display *display,
 				"and WLR_RDP_TLS_KEY_PATH to be set.");
 		return NULL;
 	}
-	return wlr_rdp_backend_create(display, create_renderer_func,
-			cert_path, key_path);
+	struct wlr_backend *backend = wlr_rdp_backend_create(
+			display, create_renderer_func, cert_path, key_path);
+	const char *address = getenv("WLR_RDP_ADDRESS");
+	if (address) {
+		wlr_rdp_backend_set_address(backend, address);
+	}
+	const char *_port = getenv("WLR_RDP_PORT");
+	if (_port) {
+		char *endptr;
+		int port = strtol(_port, &endptr, 10);
+		if (*endptr || port <= 0 || port >= 1024) {
+			wlr_log(WLR_ERROR, "Expected WLR_RDP_PORT to be a "
+					"positive integer less than 1024");
+			wlr_backend_destroy(backend);
+			return NULL;
+		}
+		wlr_rdp_backend_set_port(backend, port);
+	}
+	return backend;
 }
 #endif
 
