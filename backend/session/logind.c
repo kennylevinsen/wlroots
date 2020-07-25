@@ -50,7 +50,8 @@ static struct logind_session *logind_session_from_session(
 	return (struct logind_session *)base;
 }
 
-static int logind_take_device(struct wlr_session *base, const char *path) {
+static int logind_take_device(struct wlr_session *base, const char *path, int *device_id) {
+	(void)device_id;
 	struct logind_session *session = logind_session_from_session(base);
 
 	int fd = -1;
@@ -100,8 +101,9 @@ out:
 	return fd;
 }
 
-static void logind_release_device(struct wlr_session *base, int fd) {
+static void logind_release_device(struct wlr_session *base, int fd, int device_id) {
 	struct logind_session *session = logind_session_from_session(base);
+	(void)device_id;
 
 	struct stat st;
 	if (fstat(fd, &st) < 0) {

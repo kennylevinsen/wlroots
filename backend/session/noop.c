@@ -10,11 +10,11 @@
 
 const struct session_impl session_noop;
 
-static int noop_session_open(struct wlr_session *base, const char *path) {
+static int noop_session_open(struct wlr_session *base, const char *path, int *device_id) {
 	return open(path, O_RDWR | O_CLOEXEC);
 }
 
-static void noop_session_close(struct wlr_session *base, int fd) {
+static void noop_session_close(struct wlr_session *base, int fd, int device_id) {
 	close(fd);
 }
 

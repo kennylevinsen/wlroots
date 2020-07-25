@@ -14,8 +14,8 @@
 struct session_impl {
 	struct wlr_session *(*create)(struct wl_display *disp);
 	void (*destroy)(struct wlr_session *session);
-	int (*open)(struct wlr_session *session, const char *path);
-	void (*close)(struct wlr_session *session, int fd);
+	int (*open)(struct wlr_session *session, const char *path, int *device_id);
+	void (*close)(struct wlr_session *session, int fd, int device_id);
 	bool (*change_vt)(struct wlr_session *session, unsigned vt);
 };
 

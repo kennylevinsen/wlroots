@@ -15,11 +15,13 @@
 #include <xf86drmMode.h>
 #include "util/signal.h"
 
+extern const struct session_impl session_libseat;
 extern const struct session_impl session_logind;
 extern const struct session_impl session_direct;
 extern const struct session_impl session_noop;
 
 static const struct session_impl *impls[] = {
+	&session_libseat,
 #if WLR_HAS_SYSTEMD || WLR_HAS_ELOGIND
 	&session_logind,
 #endif
@@ -70,7 +72,10 @@ struct wlr_session *wlr_session_create(struct wl_display *disp) {
 
 	const char *env_wlr_session = getenv("WLR_SESSION");
 	if (env_wlr_session) {
-		if (strcmp(env_wlr_session, "logind") == 0 ||
+		if (strcmp(env_wlr_session, "libseat") == 0 ||
+				strcmp(env_wlr_session, "perfection") == 0) {
+			session = session_libseat.create(disp);
+		} else if (strcmp(env_wlr_session, "logind") == 0 ||
 				strcmp(env_wlr_session, "systemd") == 0) {
 #if WLR_HAS_SYSTEMD || WLR_HAS_ELOGIND
 			session = session_logind.create(disp);
@@ -157,7 +162,8 @@ void wlr_session_destroy(struct wlr_session *session) {
 }
 
 int wlr_session_open_file(struct wlr_session *session, const char *path) {
-	int fd = session->impl->open(session, path);
+	int device_id;
+	int fd = session->impl->open(session, path, &device_id);
 	if (fd < 0) {
 		return fd;
 	}
@@ -176,6 +182,7 @@ int wlr_session_open_file(struct wlr_session *session, const char *path) {
 
 	dev->fd = fd;
 	dev->dev = st.st_rdev;
+	dev->device_id = device_id;
 	wl_signal_init(&dev->signal);
 	wl_list_insert(&session->devices, &dev->link);
 
@@ -203,7 +210,7 @@ static struct wlr_device *find_device(struct wlr_session *session, int fd) {
 void wlr_session_close_file(struct wlr_session *session, int fd) {
 	struct wlr_device *dev = find_device(session, fd);
 
-	session->impl->close(session, fd);
+	session->impl->close(session, fd, dev->device_id);
 	wl_list_remove(&dev->link);
 	free(dev);
 }

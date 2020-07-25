@@ -11,6 +11,8 @@ struct session_impl;
 struct wlr_device {
 	int fd;
 	dev_t dev;
+	int device_id;
+
 	struct wl_signal signal;
 
 	struct wl_list link;

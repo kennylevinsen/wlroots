@@ -12,6 +12,9 @@ endif
 
 # logind
 
+wlr_files += files('libseat.c')
+wlr_deps += dependency('libseat')
+
 msg = []
 if get_option('logind').enabled()
 	msg += 'Install "lib@0@" or pass "-Dlogind=disabled".'
