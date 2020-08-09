@@ -1,13 +1,11 @@
 #define _POSIX_C_SOURCE 200809L
 #include <assert.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
-#include <sys/sysmacros.h>
 #include <unistd.h>
 #include <wayland-server-core.h>
 #include <wlr/backend/session/interface.h>

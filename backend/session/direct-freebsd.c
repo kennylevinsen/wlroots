@@ -39,8 +39,9 @@ static struct direct_session *direct_session_from_session(
 	return (struct direct_session *)base;
 }
 
-static int direct_session_open(struct wlr_session *base, const char *path) {
+static int direct_session_open(struct wlr_session *base, const char *path, int *device_id) {
 	struct direct_session *session = direct_session_from_session(base);
+	(void)device_id;
 
 	int fd = direct_ipc_open(session->sock, path);
 	if (fd < 0) {
@@ -52,8 +53,9 @@ static int direct_session_open(struct wlr_session *base, const char *path) {
 	return fd;
 }
 
-static void direct_session_close(struct wlr_session *base, int fd) {
+static void direct_session_close(struct wlr_session *base, int fd, int device_id) {
 	struct direct_session *session = direct_session_from_session(base);
+	(void)device_id;
 
 	int ev;
 	struct drm_version dv = {0};
