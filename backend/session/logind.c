@@ -693,7 +693,6 @@ static bool get_display_session(char **session_id) {
 	assert(session_id != NULL);
 	int ret;
 
-	char *type = NULL;
 	char *state = NULL;
 	char *xdg_session_id = getenv("XDG_SESSION_ID");
 
@@ -728,21 +727,6 @@ static bool get_display_session(char **session_id) {
 
 	assert(*session_id != NULL);
 
-	// Check that the available session is graphical
-	ret = sd_session_get_type(*session_id, &type);
-	if (ret < 0) {
-		wlr_log(WLR_ERROR, "Couldn't get a type for session '%s': %s",
-				*session_id, strerror(-ret));
-		goto error;
-	}
-
-	const char *graphical_session_types[] = {"wayland", "x11", "mir", NULL};
-	if (!contains_str(type, graphical_session_types)) {
-		wlr_log(WLR_ERROR, "Session '%s' isn't a graphical session (type: '%s')",
-				*session_id, type);
-		goto error;
-	}
-
 	// Check that the session is active
 	ret = sd_session_get_state(*session_id, &state);
 	if (ret < 0) {
@@ -757,12 +741,10 @@ static bool get_display_session(char **session_id) {
 		goto error;
 	}
 
-	free(type);
 	free(state);
 	return true;
 
 error:
-	free(type);
 	free(state);
 	free(*session_id);
 	*session_id = NULL;
