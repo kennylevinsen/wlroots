@@ -23,17 +23,29 @@
 
 #define WAIT_GPU_TIMEOUT 10000 // ms
 
-static void handle_enable_seat(struct libseat *seat, void *data) {
+static void handle_idle_enable_seat(void *data) {
 	struct wlr_session *session = data;
 	session->active = true;
 	wlr_signal_emit_safe(&session->events.active, NULL);
 }
 
-static void handle_disable_seat(struct libseat *seat, void *data) {
+static void handle_idle_disable_seat(void *data) {
 	struct wlr_session *session = data;
 	session->active = false;
 	wlr_signal_emit_safe(&session->events.active, NULL);
 	libseat_disable_seat(session->seat_handle);
+}
+
+static void handle_enable_seat(struct libseat *seat, void *data) {
+	struct wlr_session *session = data;
+	struct wl_event_loop *event_loop = wl_display_get_event_loop(session->display);
+	wl_event_loop_add_idle(event_loop, handle_idle_enable_seat, session);
+}
+
+static void handle_disable_seat(struct libseat *seat, void *data) {
+	struct wlr_session *session = data;
+	struct wl_event_loop *event_loop = wl_display_get_event_loop(session->display);
+	wl_event_loop_add_idle(event_loop, handle_idle_disable_seat, session);
 }
 
 static int libseat_event(int fd, uint32_t mask, void *data) {
